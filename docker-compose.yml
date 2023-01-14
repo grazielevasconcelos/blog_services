@@ -1,0 +1,68 @@
+version: "3.9"
+
+volumes:
+  db_data:
+  gem_cache:
+  shared_data:
+
+services:
+  db:
+    image: postgres:15.1
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - shared_data:/var/shared
+    environment:
+      POSTGRES_USER: ${DATABASE_USERNAME}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+    ports:
+      - "5432:5432"
+
+  mailcatcher:
+    image: schickling/mailcatcher
+    ports:
+      - "1025:1025"
+      - "1080:1080"
+
+  web:
+    build: .
+    volumes:
+      - .:/var/app
+      - shared_data:/var/shared
+      - gem_cache:/usr/local/bundle/gems
+    ports:
+      - "3000:3000"
+    stdin_open: true
+    tty: true
+    entrypoint: entrypoint.sh
+    command: ['rails', 'server', '-p', '3000', '-b', '0.0.0.0']
+    environment:
+      RAILS_ENV: development
+      DATABASE_NAME: blog_services_development
+      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_HOST: 'db'
+    depends_on:
+      - db
+      - mailcatcher
+
+  test:
+    build: .
+    volumes:
+      - .:/var/app
+      - shared_data:/var/shared
+      - gem_cache:/usr/local/bundle/gems
+    ports:
+      - "3001:3000"
+    stdin_open: true
+    tty: true
+    entrypoint: entrypoint.sh
+    command: ['rspec', '-fdoc']
+    environment:
+      RAILS_ENV: test
+      DATABASE_NAME: blog_services_test
+      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_HOST: 'db'
+    depends_on:
+      - db
+      - mailcatcher
